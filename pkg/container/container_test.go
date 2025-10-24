@@ -3,6 +3,7 @@ package container
 import (
 	"bytes"
 	"fmt"
+	"strings"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
@@ -1113,4 +1114,155 @@ var _ = ginkgo.Describe("the container", func() {
 			})
 		})
 	})
+
+	ginkgo.Describe("PodmanNetworkMode Configuration", func() {
+		var mockContainer *Container
+		containerName := "test-container"
+		containerID := "test-container-id"
+
+		WithContainerNetworkMode := func(networkMode string) MockContainerUpdate {
+			return func(c *dockerContainerType.InspectResponse, _ *dockerImageType.InspectResponse) {
+				if c.HostConfig == nil {
+					c.HostConfig = &dockerContainerType.HostConfig{}
+				}
+				c.HostConfig.NetworkMode = dockerContainerType.NetworkMode(networkMode)
+			}
+		}
+
+		ginkgo.BeforeEach(func() {
+			mockContainer = MockContainer(WithContainerNetworkMode("container:/server"))
+			inspectResponse := dockerContainerType.InspectResponse{
+				ContainerJSONBase: &dockerContainerType.ContainerJSONBase{
+					ID:         containerID,
+					Name:       "/" + containerName,
+					HostConfig: mockContainer.GetCreateHostConfig(),
+					State:      &dockerContainerType.State{Running: true},
+				},
+				Config: &dockerContainerType.Config{},
+			}
+			mockContainer.containerInfo = &inspectResponse
+		})
+
+		ginkgo.When("PodmanNetworkMode is true and network mode is container", func() {
+			ginkgo.It("sets networkConfig to nil, transforms NetworkMode, and logs debug message", func() {
+				logOutput := &bytes.Buffer{}
+				logrus.SetOutput(logOutput)
+				logrus.SetLevel(logrus.DebugLevel)
+
+				clog := logrus.WithFields(logrus.Fields{
+					"container": mockContainer.Name(),
+					"id":        mockContainer.ID().ShortID(),
+				})
+
+				hostConfig := mockContainer.GetCreateHostConfig()
+				isNetworkModeContainer := hostConfig.NetworkMode.IsContainer()
+				podmanNetworkMode := true
+				networkConfig := getNetworkConfig(mockContainer, "1.44")
+
+				if podmanNetworkMode && isNetworkModeContainer {
+					connectedContainer := hostConfig.NetworkMode.ConnectedContainer()
+					podmanConnectedContainer := strings.TrimPrefix(connectedContainer, "/")
+					hostConfig.NetworkMode = dockerContainerType.NetworkMode("container:" + podmanConnectedContainer)
+					networkConfig = nil
+					clog.Debug("Patched NetworkMode and NetworkingConfig (Podman container network mode)")
+				}
+
+				gomega.Expect(string(hostConfig.NetworkMode)).To(gomega.Equal("container:server"),
+					"NetworkMode should be transformed to remove slash for Podman compatibility")
+				gomega.Expect(networkConfig).To(gomega.BeNil(),
+					"networkConfig should be nil when PodmanNetworkMode is true")
+				gomega.Expect(logOutput.String()).To(gomega.ContainSubstring(
+					"Patched NetworkMode and NetworkingConfig (Podman container network mode)"))
+			})
+		})
+
+		ginkgo.When("PodmanNetworkMode is false", func() {
+			ginkgo.It("preserves NetworkMode and networkConfig, and does not log debug message", func() {
+				logOutput := &bytes.Buffer{}
+				logrus.SetOutput(logOutput)
+				logrus.SetLevel(logrus.DebugLevel)
+
+				clog := logrus.WithFields(logrus.Fields{
+					"container": mockContainer.Name(),
+					"id":        mockContainer.ID().ShortID(),
+				})
+
+				hostConfig := mockContainer.GetCreateHostConfig()
+				originalNetworkMode := hostConfig.NetworkMode
+				isNetworkModeContainer := hostConfig.NetworkMode.IsContainer()
+				podmanNetworkMode := false
+				var networkConfig = &dockerNetworkType.NetworkingConfig{
+					EndpointsConfig: make(map[string]*dockerNetworkType.EndpointSettings),
+				}
+
+				if podmanNetworkMode && isNetworkModeContainer {
+					connectedContainer := hostConfig.NetworkMode.ConnectedContainer()
+					podmanConnectedContainer := strings.TrimPrefix(connectedContainer, "/")
+					hostConfig.NetworkMode = dockerContainerType.NetworkMode("container:" + podmanConnectedContainer)
+					networkConfig = nil
+					clog.Debug("Patched NetworkMode and NetworkingConfig (Podman container network mode)")
+				}
+
+				gomega.Expect(hostConfig.NetworkMode).To(gomega.Equal(originalNetworkMode),
+					"NetworkMode should remain unchanged when PodmanNetworkMode is false")
+				gomega.Expect(networkConfig).NotTo(gomega.BeNil(),
+					"networkConfig should not be nil when PodmanNetworkMode is false")
+				gomega.Expect(logOutput.String()).NotTo(gomega.ContainSubstring(
+					"Patched NetworkMode and NetworkingConfig (Podman container network mode)"))
+			})
+		})
+
+		ginkgo.When("PodmanNetworkMode is true but network mode is not container", func() {
+			ginkgo.BeforeEach(func() {
+				mockContainer = MockContainer(WithContainerNetworkMode("bridge"))
+				inspectResponse := dockerContainerType.InspectResponse{
+					ContainerJSONBase: &dockerContainerType.ContainerJSONBase{
+						ID:         containerID,
+						Name:       "/" + containerName,
+						HostConfig: mockContainer.GetCreateHostConfig(),
+						State:      &dockerContainerType.State{Running: true},
+					},
+					Config: &dockerContainerType.Config{},
+				}
+				mockContainer.containerInfo = &inspectResponse
+			})
+
+			ginkgo.It("preserves NetworkMode and networkConfig, and does not log debug message", func() {
+
+				logOutput := &bytes.Buffer{}
+				logrus.SetOutput(logOutput)
+				logrus.SetLevel(logrus.DebugLevel)
+
+				clog := logrus.WithFields(logrus.Fields{
+					"container": "test",
+					"id":        "test",
+				})
+				clog.Debug("TEST: Before the conditional")
+
+				hostConfig := mockContainer.GetCreateHostConfig()
+				originalNetworkMode := hostConfig.NetworkMode
+				isNetworkModeContainer := hostConfig.NetworkMode.IsContainer()
+				podmanNetworkMode := true
+				var networkConfig = &dockerNetworkType.NetworkingConfig{
+					EndpointsConfig: make(map[string]*dockerNetworkType.EndpointSettings),
+				}
+
+				if podmanNetworkMode && isNetworkModeContainer {
+					connectedContainer := hostConfig.NetworkMode.ConnectedContainer()
+					podmanConnectedContainer := strings.TrimPrefix(connectedContainer, "/")
+					hostConfig.NetworkMode = dockerContainerType.NetworkMode("container:" + podmanConnectedContainer)
+					networkConfig = nil
+					clog.Debug("Patched NetworkMode and NetworkingConfig (Podman container network mode)")
+				}
+
+				gomega.Expect(hostConfig.NetworkMode).To(gomega.Equal(originalNetworkMode),
+					"NetworkMode should remain unchanged when network mode is not container")
+				gomega.Expect(networkConfig).NotTo(gomega.BeNil(),
+					"networkConfig should not be nil when network mode is not container")
+				gomega.Expect(logOutput.String()).NotTo(gomega.ContainSubstring(
+					"Patched NetworkMode and NetworkingConfig (Podman container network mode)"))
+			})
+		})
+	})
+
 })

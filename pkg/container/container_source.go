@@ -636,6 +636,12 @@ func debugLogMacAddress(
 		"min_version": minSupportedVersion,
 	})
 
+	// Handle nil networkConfig (e.g., Podman container network mode)
+	if networkConfig == nil || networkConfig.EndpointsConfig == nil {
+		clog.Debug("No network configuration available skipping MAC address debug")
+		return
+	}
+
 	// Check for MAC addresses in the config.
 	foundMac := false
 

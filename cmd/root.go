@@ -253,6 +253,7 @@ func preRun(cmd *cobra.Command, _ []string) {
 	removeVolumes, _ := flagsSet.GetBool("remove-volumes")
 	warnOnHeadPullFailed, _ := flagsSet.GetString("warn-on-head-failure")
 	disableMemorySwappiness, _ := flagsSet.GetBool("disable-memory-swappiness")
+	podmanNetworkMode, _ := flagsSet.GetBool("podman-network-mode")
 
 	// Warn about potential redundancy in flag combinations that could result in no action.
 	if monitorOnly && noPull {
@@ -269,6 +270,7 @@ func preRun(cmd *cobra.Command, _ []string) {
 		RemoveVolumes:           removeVolumes,
 		IncludeRestarting:       includeRestarting,
 		DisableMemorySwappiness: disableMemorySwappiness,
+		PodmanNetworkMode:       podmanNetworkMode,
 		WarnOnHeadFailed:        container.WarningStrategy(warnOnHeadPullFailed),
 	})
 

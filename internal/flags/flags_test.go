@@ -644,3 +644,17 @@ func TestDisableMemorySwappinessFlag(t *testing.T) {
 	require.NoError(t, err)
 	assert.True(t, disableMemorySwappiness, "disable-memory-swappiness flag should be true")
 }
+
+func TestPodmanNetworkModeFlag(t *testing.T) {
+	cmd := new(cobra.Command)
+
+	SetDefaults()
+	RegisterSystemFlags(cmd)
+
+	err := cmd.ParseFlags([]string{"--podman-network-mode"})
+	require.NoError(t, err)
+
+	podmanNetworkMode, err := cmd.PersistentFlags().GetBool("podman-network-mode")
+	require.NoError(t, err)
+	assert.True(t, podmanNetworkMode, "podman-network-mode flag should be true")
+}

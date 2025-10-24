@@ -268,6 +268,13 @@ func RegisterSystemFlags(rootCmd *cobra.Command) {
 		"Label used for setting memory swappiness as nil when recreating the container, used for compatibility with podman",
 	)
 
+	flags.BoolP(
+		"podman-network-mode",
+		"",
+		envBool("WATCHTOWER_PODMAN_NETWORK_MODE"),
+		"Label used for setting networkConfig to nil and remove `/` from `container:/service`, used for compatibility with podman",
+	)
+
 	flags.Bool(
 		"registry-tls-skip",
 		envBool("WATCHTOWER_REGISTRY_TLS_SKIP"),

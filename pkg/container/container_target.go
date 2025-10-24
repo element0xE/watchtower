@@ -3,6 +3,7 @@ package container
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/sirupsen/logrus"
 
@@ -25,6 +26,7 @@ import (
 //   - clientVersion: API version of the client.
 //   - minSupportedVersion: Minimum API version for full features.
 //   - disableMemorySwappiness: Whether to disable memory swappiness for Podman compatibility.
+//   - podmanNetworkMode: Whether to enable network compat mode for Podman when network_mode is container: or service:
 //
 // Returns:
 //   - types.ContainerID: ID of the new container.
@@ -37,6 +39,7 @@ func StartTargetContainer(
 	clientVersion string,
 	minSupportedVersion string,
 	disableMemorySwappiness bool,
+	podmanNetworkMode bool,
 ) (types.ContainerID, error) {
 	ctx := context.Background()
 	clog := logrus.WithFields(logrus.Fields{
@@ -47,12 +50,24 @@ func StartTargetContainer(
 	// Extract configuration from the source container.
 	config := sourceContainer.GetCreateConfig()
 	hostConfig := sourceContainer.GetCreateHostConfig()
+	isNetworkModeContainer := hostConfig.NetworkMode.IsContainer()
 
 	// Set MemorySwappiness to nil for Podman compatibility if flag is enabled.
 	if disableMemorySwappiness {
 		hostConfig.MemorySwappiness = nil
 
 		clog.Debug("Disabled memory swappiness for Podman compatibility")
+	}
+
+	// Set networkConfig to nil and set NetworkMode Podman compatible if flag is enabled.
+	if podmanNetworkMode && isNetworkModeContainer {
+		connectedContainer := hostConfig.NetworkMode.ConnectedContainer()
+		podmanConnectedContainer := strings.TrimPrefix(connectedContainer, "/")
+		//Safe as Podman normalizes service:name as container:name
+		hostConfig.NetworkMode = dockerContainerType.NetworkMode("container:" + podmanConnectedContainer)
+		networkConfig = nil
+
+		clog.Debug("Patched NetworkMode and NetworkingConfig (Podman container network mode)")
 	}
 
 	// Log network details for debugging.

@@ -91,6 +91,7 @@ type ClientOptions struct {
 	ReviveStopped           bool
 	IncludeRestarting       bool
 	DisableMemorySwappiness bool
+	PodmanNetworkMode       bool
 	WarnOnHeadFailed        WarningStrategy
 }
 
@@ -266,6 +267,7 @@ func (c client) StartContainer(container types.Container) (types.ContainerID, er
 		clientVersion,
 		flags.DockerAPIMinVersion, // Docker API Version 1.24
 		c.DisableMemorySwappiness,
+		c.PodmanNetworkMode,
 	)
 	if err != nil {
 		logrus.WithFields(fields).WithError(err).Debug("Failed to start new container")
